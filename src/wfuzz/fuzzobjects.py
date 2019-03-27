@@ -373,6 +373,8 @@ class FuzzRequest(FuzzRequestUrlMixing, FuzzRequestSoupMixing):
         newreq.wf_ip = self.wf_ip
 
         newreq.headers.request = self.headers.request
+        if "Content-Type" in self.headers.request:
+            newreq._request.ContentType = self.headers.request['Content-Type']
         newreq.params.post = self.params.post
 
         newreq.follow = self.follow

@@ -151,6 +151,8 @@ class Request:
                 return self.__variablesPOST.urlEncoded()
             elif self.ContentType == "multipart/form-data":
                 return self.__variablesPOST.multipartEncoded()
+            elif self.ContentType == 'application/json':
+                return self.__variablesPOST.json_encoded()
             else:
                 return self.__variablesPOST.urlEncoded()
         else:
@@ -222,11 +224,15 @@ class Request:
         return self.__variablesPOST.variables
 
     def setPostData(self, pd, boundary=None):
+        print(self.ContentType)
+        print(pd)
         self.__variablesPOST = VariablesSet()
         if self.ContentType == "application/x-www-form-urlencoded":
             self.__variablesPOST.parseUrlEncoded(pd)
         elif self.ContentType == "multipart/form-data":
             self.__variablesPOST.parseMultipart(pd, boundary)
+        elif self.ContentType == 'application/json':
+            return self.__variablesPOST.parse_json_encoded(pd)
         else:
             self.__variablesPOST.parseUrlEncoded(pd)
 

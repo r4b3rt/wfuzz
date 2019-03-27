@@ -40,12 +40,15 @@ REPLACE_HOSTNAMES = [
 # script args
 
 testing_savedsession_tests = [
+    ("test_novalue_post_fuzz", "-z list --zD anything -u {}/FUZZ -d {{\"a\":\"2\"}} -H Content-Type:application/json".format(HTTPBIN_URL), "-z wfuzzp --zD $$PREVFILE$$ -u FUZZ --field r.params.post.a", ["1"], None),
 ]
 
 testing_tests = [
+    # (wfuzzdev3) javi@nanroig:~/dev/wfuzz$ ./wfuzz -z list --zD anything -u http://localhost:9000/FUZZ -d '{"a":"1", "b":"2"}' --oF /tmp/sesssion -H 'Content-Type: application/json' --field r
 ]
 
 savedsession_tests = [
+    # parse post params
     ("test_novalue_post_fuzz", "-z list --zD a -u {}/anything -d FUZZ".format(HTTPBIN_URL), "-z wfuzzp --zD $$PREVFILE$$ -u FUZZ --filter r.params.post.a:=1 --field r.params.post.a", ["1"], None),
 
     # field fuzz values
