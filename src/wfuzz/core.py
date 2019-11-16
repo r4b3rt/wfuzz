@@ -13,6 +13,7 @@ from .fuzzqueues import (
     DryRunQ,
     HttpQueue,
     HttpReceiver,
+    AllVarQ,
 )
 
 from .fuzzobjects import FuzzResultFactory, FuzzStats
@@ -113,10 +114,6 @@ class requestGenerator(object):
 
         self.stats = FuzzStats.from_requestGenerator(self)
 
-        self._allvar_gen = None
-        if self.seed.history.wf_allvars is not None:
-            self._allvar_gen = self.__allvars_gen(self.dictio)
-
     def stop(self):
         self.stats.cancelled = True
         self.close()
@@ -159,26 +156,15 @@ class requestGenerator(object):
     def __iter__(self):
         return self
 
-    def __allvars_gen(self, dic):
-        if len(self.seed.history.wf_allvars_set) == 0:
-            raise FuzzExceptBadOptions("No variables on specified variable set: " + self.seed.history.wf_allvars)
-
-        for payload in dic:
-            for r in FuzzResultFactory.from_all_fuzz_request(self.seed, payload):
-                yield r
-
     def __next__(self):
         if self.stats.cancelled:
             raise StopIteration
 
-        if self.seed.history.wf_allvars is not None:
-            return next(self._allvar_gen)
-        else:
-            n = next(self.dictio)
-            if self.stats.processed() == 0 or (self.options["compiled_baseline"] is not None and self.stats.processed() == 1):
-                self._check_dictio_len(n)
+        n = next(self.dictio)
+        if self.stats.processed() == 0 or (self.options["compiled_baseline"] is not None and self.stats.processed() == 1):
+            self._check_dictio_len(n)
 
-            return FuzzResultFactory.from_seed(self.seed, n, self.options)
+        return FuzzResultFactory.from_seed(self.seed, n, self.options)
 
     def close(self):
         for payload in self._payload_list:
@@ -243,7 +229,10 @@ class Fuzzer(object):
         self.qmanager = QueueManager(options)
         self.results_queue = MyPriorityQueue()
 
-        self.qmanager.add("seed_queue", SeedQ(options))
+        if options["allvars"]:
+            self.qmanager.add("allvars_queue", AllVarQ(options))
+        else:
+            self.qmanager.add("seed_queue", SeedQ(options))
 
         if options.get('compiled_prefilter').is_active():
             self.qmanager.add("slice_queue", SliceQ(options))

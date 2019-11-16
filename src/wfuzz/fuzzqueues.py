@@ -4,12 +4,57 @@ import gzip
 from threading import Thread, Event
 from queue import Queue
 
-from .fuzzobjects import FuzzResult
 from .myqueues import FuzzQueue
 from .exception import FuzzExceptInternalError, FuzzExceptBadOptions, FuzzExceptBadFile, FuzzExceptPluginLoadError, FuzzExceptPluginError
 from .myqueues import FuzzRRQueue
 from .facade import Facade
-from .fuzzobjects import PluginResult, PluginItem
+from .fuzzobjects import (
+    PluginResult,
+    PluginItem,
+    FuzzResult,
+    FuzzPayload
+)
+
+
+class AllVarQ(FuzzQueue):
+    def __init__(self, options):
+        FuzzQueue.__init__(self, options)
+        self.delay = options.get("delay")
+        self.genReq = options.get("compiled_genreq")
+        self.seed = options.get("compiled_seed")
+
+    def get_name(self):
+        return 'AllVarQ'
+
+    def cancel(self):
+        self.genReq.stop()
+
+    def from_all_fuzz_request(self, payload):
+        # only a fuzz payload is allowed using this technique
+        if len(payload) > 1:
+            raise FuzzExceptBadOptions("Only one payload is allowed when fuzzing all parameters!")
+
+        for var_name in self.seed.history.wf_allvars_set.keys():
+            payload_content = payload[0]
+            fuzzres = self.seed.from_soft_copy()
+            fuzzres.payload.append(FuzzPayload(payload_content, [None]))
+
+            fuzzres.history.wf_allvars_set = {var_name: payload_content}
+
+            yield fuzzres
+
+    def process(self, item):
+        if item.type == FuzzResult.startseed:
+            self.genReq.stats.pending_seeds.inc()
+        else:
+            raise FuzzExceptInternalError("AllVarQ: Unknown item type in queue!")
+
+        for payload in self.genReq.dictio:
+            for fuzzres in self.from_all_fuzz_request(payload):
+                self.genReq.stats.pending_fuzz.inc()
+                self.send(fuzzres)
+
+        self.send_last(FuzzResult.to_new_signal(FuzzResult.endseed))
 
 
 class SeedQ(FuzzQueue):

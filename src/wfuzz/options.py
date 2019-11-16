@@ -302,6 +302,9 @@ class FuzzSession(UserDict):
         if self.data["allvars"] and self.data['compiled_baseline']:
             raise FuzzExceptBadOptions("Bad options: Baseline is not allowed when using all parameters brute forcing.")
 
+        if self.data["allvars"] and len(self.data["compiled_seed"].history.wf_allvars_set) == 0:
+            raise FuzzExceptBadOptions("Bad options: No variables on specified variable set: " + self.data["compiled_seed"].history.wf_allvars)
+
         if self.data["compiled_baseline"] is None and (BASELINE_CODE in self.data['hc'] or
            BASELINE_CODE in self.data['hl'] or BASELINE_CODE in self.data['hw'] or
            BASELINE_CODE in self.data['hh']):
