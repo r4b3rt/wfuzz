@@ -18,7 +18,7 @@ from collections import defaultdict
 
 from .filter import FuzzResFilter
 from .externals.reqresp import Request, Response
-from .exception import FuzzExceptBadAPI, FuzzExceptBadOptions, FuzzExceptInternalError, FuzzException
+from .exception import FuzzExceptBadAPI, FuzzExceptBadOptions, FuzzExceptInternalError
 from .facade import Facade, ERROR_CODE
 from .mixins import FuzzRequestUrlMixing, FuzzRequestSoupMixing
 
@@ -361,6 +361,18 @@ class FuzzRequest(FuzzRequestUrlMixing, FuzzRequestSoupMixing):
 
     # methods wfuzz needs for substituing payloads and building dictionaries
 
+    def get_baseline_markers(self, options):
+        rawReq = str(self)
+        auth_method, userpass = self.auth
+
+        # get the baseline payload ordered by fuzz number and only one value per same fuzz keyword.
+        b1 = dict([matchgroup.groups() for matchgroup in re.finditer(r"FUZ(\d*)Z(?:\[.*?\])?(?:{(.*?)})?", rawReq, re.MULTILINE | re.DOTALL)])
+        b2 = dict([matchgroup.groups() for matchgroup in re.finditer(r"FUZ(\d*)Z(?:\[.*?\])?(?:{(.*?)})?", userpass, re.MULTILINE | re.DOTALL)])
+        baseline_control = dict(list(b1.items()) + list(b2.items()))
+        baseline_payload = [x[1] for x in sorted(list(baseline_control.items()), key=operator.itemgetter(0))]
+
+        return [x for x in baseline_payload if x is not None]
+
     def update_from_options(self, options):
         if options["url"] != "FUZZ":
             self.url = options["url"]
@@ -501,14 +513,8 @@ class FuzzResultFactory:
         rawReq = str(fuzzresult.history)
         auth_method, userpass = fuzzresult.history.auth
 
-        # get the baseline payload ordered by fuzz number and only one value per same fuzz keyword.
-        b1 = dict([matchgroup.groups() for matchgroup in re.finditer(r"FUZ(\d*)Z(?:\[.*?\])?(?:{(.*?)})?", rawReq, re.MULTILINE | re.DOTALL)])
-        b2 = dict([matchgroup.groups() for matchgroup in re.finditer(r"FUZ(\d*)Z(?:\[.*?\])?(?:{(.*?)})?", userpass, re.MULTILINE | re.DOTALL)])
-        baseline_control = dict(list(b1.items()) + list(b2.items()))
-        baseline_payload = [x[1] for x in sorted(list(baseline_control.items()), key=operator.itemgetter(0))]
-
-        # if there is no marker, there is no baseline request
-        if not [x for x in baseline_payload if x is not None]:
+        baseline_payload = fuzzresult.get_baseline_markers(options)
+        if not baseline_payload:
             return None
 
         # remove baseline marker from seed request
@@ -876,6 +882,9 @@ class FuzzResult:
 
     def __ne__(self, other):
         return self.nres != other.nres
+
+    def get_baseline_markers(self, options):
+        return self.history.get_baseline_markers(options)
 
 
 class PluginItem:
