@@ -293,8 +293,14 @@ class FuzzSession(UserDict):
         # Check payload num
         fuzz_words = self.data["compiled_filter"].get_fuzz_words() + self.data["compiled_prefilter"].get_fuzz_words() + self.data["compiled_genreq"].get_fuzz_words()
 
+        if self.data['allvars'] and len(set(fuzz_words)) > 0:
+            raise FuzzExceptBadOptions("Bad options: FUZZ words not allowed when using all parameters brute forcing.")
+
         if self.data['allvars'] is None and len(set(fuzz_words)) == 0:
             raise FuzzExceptBadOptions("You must specify at least a FUZZ word!")
+
+        if self.data["allvars"] and self.data['compiled_baseline']:
+            raise FuzzExceptBadOptions("Bad options: Baseline is not allowed when using all parameters brute forcing.")
 
         if self.data["compiled_baseline"] is None and (BASELINE_CODE in self.data['hc'] or
            BASELINE_CODE in self.data['hl'] or BASELINE_CODE in self.data['hw'] or
