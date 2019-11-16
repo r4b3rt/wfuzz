@@ -1,7 +1,10 @@
 from .exception import FuzzExceptBadRecipe, FuzzExceptBadOptions, FuzzExceptBadFile
 from .facade import Facade, ERROR_CODE, BASELINE_CODE
 
-from .fuzzobjects import FuzzStats
+from .fuzzobjects import (
+    FuzzStats,
+    FuzzResultFactory
+)
 from .filter import FuzzResFilter
 from .core import requestGenerator
 from .utils import (
@@ -28,7 +31,7 @@ import json
 class FuzzSession(UserDict):
     def __init__(self, **kwargs):
         self.data = self._defaults()
-        self.keys_not_to_dump = ["interactive", "recipe", "seed_payload", "send_discarded", "compiled_genreq", "compiled_filter", "compiled_prefilter", "compiled_printer", "description", "show_field"]
+        self.keys_not_to_dump = ["interactive", "recipe", "seed_payload", "send_discarded", "compiled_genreq", "compiled_filter", "compiled_prefilter", "compiled_printer", "description", "show_field", "compiled_seed"]
 
         # recipe must be superseded by options
         if "recipe" in kwargs and kwargs["recipe"]:
@@ -96,6 +99,7 @@ class FuzzSession(UserDict):
             seed_payload=False,
             filter="",
             prefilter="",
+            compiled_seed=None,
             compiled_genreq=None,
             compiled_filter=None,
             compiled_prefilter=None,
@@ -200,6 +204,7 @@ class FuzzSession(UserDict):
     def payload(self, **kwargs):
         try:
             self.data.update(kwargs)
+            self.data["compiled_seed"] = FuzzResultFactory.from_options(self)
             self.data['compiled_genreq'] = requestGenerator(self)
             for r in self.data['compiled_genreq'].get_dictio():
                 yield r
@@ -278,6 +283,9 @@ class FuzzSession(UserDict):
         self.data["compiled_prefilter"] = FuzzResFilter(filter_string=self.data['prefilter'])
 
         # seed
+        self.data["compiled_seed"] = FuzzResultFactory.from_options(self)
+
+        # request generator
         self.data["compiled_genreq"] = requestGenerator(self)
 
         # Check payload num

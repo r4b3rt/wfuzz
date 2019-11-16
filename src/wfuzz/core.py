@@ -95,7 +95,7 @@ class dictionary(object):
 class requestGenerator(object):
     def __init__(self, options):
         self.options = options
-        self.seed = FuzzResultFactory.from_options(options)
+        self.seed = options['compiled_seed']
         self.baseline = FuzzResultFactory.from_baseline(self.seed, options)
         self._payload_list = []
         self.dictio = self.get_dictio()
