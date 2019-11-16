@@ -24,35 +24,26 @@ class SeedQ(FuzzQueue):
     def cancel(self):
         self.genReq.stop()
 
-    def process(self, item):
-        if item.type == FuzzResult.startseed:
-            self.genReq.stats.pending_seeds.inc()
-        elif item.type == FuzzResult.seed:
-            self.genReq.restart(item)
-        else:
-            raise FuzzExceptInternalError("SeedQ: Unknown item type in queue!")
+    def send_baseline(self):
+        fuzz_baseline = self.options["compiled_baseline"]
 
+        if fuzz_baseline is not None and self.genReq.stats.pending_seeds() == 1:
+            self.genReq.stats.pending_fuzz.inc()
+            self.send_first(fuzz_baseline)
+
+            # wait for BBB to be completed before generating more items
+            while(self.genReq.stats.processed() == 0 and not self.genReq.stats.cancelled):
+                time.sleep(0.0001)
+
+    def send_dictionary(self):
         # Empty dictionary?
         try:
             fuzzres = next(self.genReq)
-
-            if fuzzres.is_baseline:
-                self.genReq.stats.pending_fuzz.inc()
-                self.send_first(fuzzres)
-
-                # wait for BBB to be completed before generating more items
-                while(self.genReq.stats.processed() == 0 and not self.genReq.stats.cancelled):
-                    time.sleep(0.0001)
-
         except StopIteration:
             raise FuzzExceptBadOptions("Empty dictionary! Please check payload or filter.")
 
         # Enqueue requests
         try:
-            if fuzzres.is_baseline:
-                # more after baseline?
-                fuzzres = next(self.genReq)
-
             while fuzzres:
                 self.genReq.stats.pending_fuzz.inc()
                 if self.delay:
@@ -63,6 +54,17 @@ class SeedQ(FuzzQueue):
             pass
 
         self.send_last(FuzzResult.to_new_signal(FuzzResult.endseed))
+
+    def process(self, item):
+        if item.type == FuzzResult.startseed:
+            self.genReq.stats.pending_seeds.inc()
+        elif item.type == FuzzResult.seed:
+            self.genReq.restart(item)
+        else:
+            raise FuzzExceptInternalError("SeedQ: Unknown item type in queue!")
+
+        self.send_baseline()
+        self.send_dictionary()
 
 
 class SaveQ(FuzzQueue):

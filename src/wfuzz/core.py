@@ -1,7 +1,19 @@
 from .fuzzobjects import FuzzResult
 
 from .myqueues import MyPriorityQueue, QueueManager
-from .fuzzqueues import SeedQ, SaveQ, PrinterQ, RoutingQ, FilterQ, SliceQ, JobQ, RecursiveQ, DryRunQ, HttpQueue, HttpReceiver
+from .fuzzqueues import (
+    SeedQ,
+    SaveQ,
+    PrinterQ,
+    RoutingQ,
+    FilterQ,
+    SliceQ,
+    JobQ,
+    RecursiveQ,
+    DryRunQ,
+    HttpQueue,
+    HttpReceiver,
+)
 
 from .fuzzobjects import FuzzResultFactory, FuzzStats
 from .facade import Facade
@@ -96,7 +108,6 @@ class requestGenerator(object):
     def __init__(self, options):
         self.options = options
         self.seed = options['compiled_seed']
-        self.baseline = options['compiled_baseline']
         self._payload_list = []
         self.dictio = self.get_dictio()
 
@@ -140,7 +151,7 @@ class requestGenerator(object):
         if self.seed.history.wf_allvars is not None:
             v *= len(self.seed.history.wf_allvars_set)
 
-        if self.baseline:
+        if self.options["compiled_baseline"] is not None:
             v += 1
 
         return v
@@ -165,14 +176,11 @@ class requestGenerator(object):
         if self.stats.cancelled:
             raise StopIteration
 
-        if self.baseline and self.stats.processed() == 0 and self.stats.pending_seeds() <= 1:
-            return self.baseline
-
         if self.seed.history.wf_allvars is not None:
             return next(self._allvar_gen)
         else:
             n = next(self.dictio)
-            if self.stats.processed() == 0 or (self.baseline and self.stats.processed() == 1):
+            if self.stats.processed() == 0 or (self.options["compiled_baseline"] is not None and self.stats.processed() == 1):
                 self._check_dictio_len(n)
 
             return FuzzResultFactory.from_seed(self.seed, n, self.options)
