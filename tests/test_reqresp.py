@@ -37,14 +37,14 @@ class FuzzResultFactoryTest(unittest.TestCase):
 
     def test_baseline(self):
         options = CLParser(['wfuzz', '-z', 'range,1-1', 'http://localhost:9000/FUZZ{first}']).parse_cl()
-        seed = FuzzResultFactory.from_options(options)
-        baseline = FuzzResultFactory.from_baseline(seed, options)
+        options["compiled_seed"] = FuzzResultFactory.from_options(options)
+        baseline = FuzzResultFactory.from_baseline(options)
 
         self.assertEqual(baseline.description, 'first')
 
         options = CLParser(['wfuzz', '-z', 'range,1-1', '-z', 'range,2-2', 'http://localhost:9000/FUZZ{first}/FUZ2Z{second}']).parse_cl()
-        seed = FuzzResultFactory.from_options(options)
-        baseline = FuzzResultFactory.from_baseline(seed, options)
+        options["compiled_seed"] = FuzzResultFactory.from_options(options)
+        baseline = FuzzResultFactory.from_baseline(options)
 
         self.assertEqual(baseline.description, 'first - second')
 

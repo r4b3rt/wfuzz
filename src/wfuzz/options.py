@@ -31,7 +31,7 @@ import json
 class FuzzSession(UserDict):
     def __init__(self, **kwargs):
         self.data = self._defaults()
-        self.keys_not_to_dump = ["interactive", "recipe", "seed_payload", "send_discarded", "compiled_genreq", "compiled_filter", "compiled_prefilter", "compiled_printer", "description", "show_field", "compiled_seed"]
+        self.keys_not_to_dump = ["interactive", "recipe", "seed_payload", "send_discarded", "compiled_genreq", "compiled_filter", "compiled_prefilter", "compiled_printer", "description", "show_field", "compiled_seed", "compiled_baseline"]
 
         # recipe must be superseded by options
         if "recipe" in kwargs and kwargs["recipe"]:
@@ -100,6 +100,7 @@ class FuzzSession(UserDict):
             filter="",
             prefilter="",
             compiled_seed=None,
+            compiled_baseline=None,
             compiled_genreq=None,
             compiled_filter=None,
             compiled_prefilter=None,
@@ -284,6 +285,7 @@ class FuzzSession(UserDict):
 
         # seed
         self.data["compiled_seed"] = FuzzResultFactory.from_options(self)
+        self.data["compiled_baseline"] = FuzzResultFactory.from_baseline(self)
 
         # request generator
         self.data["compiled_genreq"] = requestGenerator(self)

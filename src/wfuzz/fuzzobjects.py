@@ -508,12 +508,13 @@ class FuzzResultFactory:
         return newres
 
     @staticmethod
-    def from_baseline(fuzzresult, options):
-        scheme = fuzzresult.history.scheme
-        rawReq = str(fuzzresult.history)
-        auth_method, userpass = fuzzresult.history.auth
+    def from_baseline(options):
+        fuzzseed = options["compiled_seed"]
+        scheme = fuzzseed.history.scheme
+        rawReq = str(fuzzseed.history)
+        auth_method, userpass = fuzzseed.history.auth
 
-        baseline_payload = fuzzresult.get_baseline_markers(options)
+        baseline_payload = fuzzseed.get_baseline_markers(options)
         if not baseline_payload:
             return None
 
@@ -523,19 +524,19 @@ class FuzzResultFactory:
                 raise FuzzExceptBadOptions("You must supply a baseline value for all the FUZZ words.")
             rawReq = rawReq.replace("{" + i + "}", '')
 
-            if fuzzresult.history.wf_fuzz_methods:
-                fuzzresult.history.wf_fuzz_methods = fuzzresult.history.wf_fuzz_methods.replace("{" + i + "}", '')
+            if fuzzseed.history.wf_fuzz_methods:
+                fuzzseed.history.wf_fuzz_methods = fuzzseed.history.wf_fuzz_methods.replace("{" + i + "}", '')
 
             if auth_method:
                 userpass = userpass.replace("{" + i + "}", '')
 
         # re-parse seed without baseline markers
-        fuzzresult.history.update_from_raw_http(rawReq, scheme)
+        fuzzseed.history.update_from_raw_http(rawReq, scheme)
         if auth_method:
-            fuzzresult.history.auth = (auth_method, userpass)
+            fuzzseed.history.auth = (auth_method, userpass)
 
         # create baseline request from seed
-        baseline_res = fuzzresult.from_soft_copy()
+        baseline_res = fuzzseed.from_soft_copy()
 
         # remove field markers from baseline
         marker_regex = re.compile(r"(FUZ\d*Z)\[(.*?)\]", re.DOTALL)
@@ -544,8 +545,8 @@ class FuzzResultFactory:
             for fw, f in results:
                 rawReq = rawReq.replace("%s[%s]" % (fw, f), fw)
 
-                if fuzzresult.history.wf_fuzz_methods:
-                    fuzzresult.history.wf_fuzz_methods = fuzzresult.history.wf_fuzz_methods.replace("{" + i + "}", '')
+                if fuzzseed.history.wf_fuzz_methods:
+                    fuzzseed.history.wf_fuzz_methods = fuzzseed.history.wf_fuzz_methods.replace("{" + i + "}", '')
 
                 if auth_method:
                     userpass = userpass.replace("{" + i + "}", '')
