@@ -16,7 +16,7 @@ from .fuzzqueues import (
     AllVarQ,
 )
 
-from .fuzzobjects import FuzzResultFactory, FuzzStats
+from .fuzzobjects import FuzzResultFactory, FuzzStats, FuzzPayload
 from .facade import Facade
 from .exception import FuzzExceptBadOptions, FuzzExceptNoPluginError
 
@@ -160,11 +160,23 @@ class requestGenerator(object):
         if self.stats.cancelled:
             raise StopIteration
 
-        n = next(self.dictio)
+        dictio_payload = next(self.dictio)
         if self.stats.processed() == 0 or (self.options["compiled_baseline"] is not None and self.stats.processed() == 1):
-            self._check_dictio_len(n)
+            self._check_dictio_len(dictio_payload)
 
-        return FuzzResultFactory.from_seed(self.seed, n, self.options)
+        start_from = 1
+        my_seed = self.seed
+
+        if self.options["seed_payload"] and isinstance(dictio_payload[0], FuzzResult):
+            my_seed = dictio_payload[0].from_soft_copy()
+            my_seed.payload = []
+            my_seed.history.update_from_options(self.options)
+            my_seed.update_from_options(self.options)
+            my_seed.payload.append(FuzzPayload(dictio_payload[0], [None]))
+
+            return FuzzResultFactory.from_seed(my_seed, dictio_payload[1:], 2)
+
+        return FuzzResultFactory.from_seed(my_seed, dictio_payload, start_from)
 
     def close(self):
         for payload in self._payload_list:

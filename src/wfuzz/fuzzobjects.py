@@ -453,7 +453,7 @@ class FuzzResultFactory:
                     raise FuzzExceptBadOptions("Tried to replace {} with a whole fuzzresult payload.".format(fuzz_word))
 
     @staticmethod
-    def from_seed(seed, payload, seed_options):
+    def from_seed(seed, payload, start_from=1):
         newres = seed.from_soft_copy()
 
         rawReq = str(newres.history)
@@ -461,26 +461,10 @@ class FuzzResultFactory:
         scheme = newres.history.scheme
         auth_method, userpass = newres.history.auth
 
-        for payload_pos, payload_content in enumerate(payload, start=1):
+        for payload_pos, payload_content in enumerate(payload, start=start_from):
             fuzz_word = "FUZ" + str(payload_pos) + "Z" if payload_pos > 1 else "FUZZ"
 
             fuzz_values_array = []
-
-            # substitute entire seed when using a request payload generator without specifying field
-            if fuzz_word == "FUZZ" and seed_options["seed_payload"] and isinstance(payload_content, FuzzResult):
-                # new seed
-                newres = payload_content.from_soft_copy()
-                newres.payload = []
-
-                fuzz_values_array.append(None)
-
-                newres.history.update_from_options(seed_options)
-                newres.update_from_options(seed_options)
-                rawReq = str(newres.history)
-                rawUrl = newres.history.redirect_url
-                scheme = newres.history.scheme
-                auth_method, userpass = newres.history.auth
-
             desc = []
 
             if auth_method and (userpass.count(fuzz_word)):
@@ -553,7 +537,7 @@ class FuzzResultFactory:
 
             baseline_res.history.update_from_raw_http(rawReq, scheme)
 
-        baseline_res = FuzzResultFactory.from_seed(baseline_res, baseline_payload, options)
+        baseline_res = FuzzResultFactory.from_seed(baseline_res, baseline_payload)
         baseline_res.is_baseline = True
 
         return baseline_res
