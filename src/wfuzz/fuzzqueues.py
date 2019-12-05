@@ -34,9 +34,9 @@ class AllVarQ(FuzzQueue):
         if len(payload) > 1:
             raise FuzzExceptBadOptions("Only one payload is allowed when fuzzing all parameters!")
 
-        for var_name in self.seed.history.wf_allvars_set.keys():
+        for var_name in self.seed.wf_allvars_set.keys():
             payload_content = payload[0]
-            fuzzres = self.seed.from_soft_copy()
+            fuzzres = FuzzResult(self.seed.from_copy())
             fuzzres.payload.append(FuzzPayload(payload_content, [None]))
 
             fuzzres.history.wf_allvars_set = {var_name: payload_content}

@@ -1,6 +1,17 @@
-from .exception import FuzzExceptBadRecipe, FuzzExceptBadOptions, FuzzExceptBadFile
-from .facade import Facade, ERROR_CODE, BASELINE_CODE
+from .exception import (
+    FuzzExceptBadRecipe,
+    FuzzExceptBadOptions,
+    FuzzExceptBadFile
+)
+from .facade import (
+    Facade,
+    ERROR_CODE,
+    BASELINE_CODE
+)
 
+from .fuzzitems import (
+    FuzzSeed,
+)
 from .fuzzobjects import (
     FuzzStats,
     FuzzResultFactory
@@ -247,6 +258,14 @@ class FuzzSession(UserDict):
     def __exit__(self, *args):
         self.close()
 
+    def get_fuzz_words(self):
+        fuzz_words = self.data["compiled_filter"].get_fuzz_words() + self.data["compiled_prefilter"].get_fuzz_words() + self.data["compiled_seed"].get_fuzz_words()
+
+        if self.data["url"] == "FUZZ":
+            fuzz_words += ["FUZZ"]
+
+        return set(fuzz_words)
+
     def compile(self):
         # Validate options
         error = self.validate()
@@ -284,26 +303,26 @@ class FuzzSession(UserDict):
         self.data["compiled_prefilter"] = FuzzResFilter(filter_string=self.data['prefilter'])
 
         # seed
-        self.data["compiled_seed"] = FuzzResultFactory.from_options(self)
-        self.data["compiled_baseline"] = FuzzResultFactory.from_baseline(self)
+        self.data["compiled_seed"] = FuzzSeed.from_options(self)
+        self.data["compiled_baseline"] = self.data["compiled_seed"].baseline
 
         # request generator
         self.data["compiled_genreq"] = requestGenerator(self)
 
         # Check payload num
-        fuzz_words = self.data["compiled_filter"].get_fuzz_words() + self.data["compiled_prefilter"].get_fuzz_words() + self.data["compiled_genreq"].get_fuzz_words()
+        fuzz_words = self.get_fuzz_words()
 
-        if self.data['allvars'] and len(set(fuzz_words)) > 0:
+        if self.data['allvars'] and len(fuzz_words) > 0:
             raise FuzzExceptBadOptions("Bad options: FUZZ words not allowed when using all parameters brute forcing.")
 
-        if self.data['allvars'] is None and len(set(fuzz_words)) == 0:
+        if self.data['allvars'] is None and len(fuzz_words) == 0:
             raise FuzzExceptBadOptions("You must specify at least a FUZZ word!")
 
         if self.data["allvars"] and self.data['compiled_baseline']:
             raise FuzzExceptBadOptions("Bad options: Baseline is not allowed when using all parameters brute forcing.")
 
-        if self.data["allvars"] and len(self.data["compiled_seed"].history.wf_allvars_set) == 0:
-            raise FuzzExceptBadOptions("Bad options: No variables on specified variable set: " + self.data["compiled_seed"].history.wf_allvars)
+        if self.data["allvars"] and len(self.data["compiled_seed"].wf_allvars_set) == 0:
+            raise FuzzExceptBadOptions("Bad options: No variables on specified variable set: " + self.data["compiled_seed"].wf_allvars)
 
         if self.data["compiled_baseline"] is None and (BASELINE_CODE in self.data['hc'] or
            BASELINE_CODE in self.data['hl'] or BASELINE_CODE in self.data['hw'] or

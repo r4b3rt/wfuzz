@@ -361,18 +361,6 @@ class FuzzRequest(FuzzRequestUrlMixing, FuzzRequestSoupMixing):
 
     # methods wfuzz needs for substituing payloads and building dictionaries
 
-    def get_baseline_markers(self, options):
-        rawReq = str(self)
-        auth_method, userpass = self.auth
-
-        # get the baseline payload ordered by fuzz number and only one value per same fuzz keyword.
-        b1 = dict([matchgroup.groups() for matchgroup in re.finditer(r"FUZ(\d*)Z(?:\[.*?\])?(?:{(.*?)})?", rawReq, re.MULTILINE | re.DOTALL)])
-        b2 = dict([matchgroup.groups() for matchgroup in re.finditer(r"FUZ(\d*)Z(?:\[.*?\])?(?:{(.*?)})?", userpass, re.MULTILINE | re.DOTALL)])
-        baseline_control = dict(list(b1.items()) + list(b2.items()))
-        baseline_payload = [x[1] for x in sorted(list(baseline_control.items()), key=operator.itemgetter(0))]
-
-        return [x for x in baseline_payload if x is not None]
-
     def update_from_options(self, options):
         if options["url"] != "FUZZ":
             self.url = options["url"]
@@ -454,12 +442,14 @@ class FuzzResultFactory:
 
     @staticmethod
     def from_seed(seed, payload, start_from=1):
-        newres = seed.from_soft_copy()
+        new_req = seed.from_copy()
 
-        rawReq = str(newres.history)
-        rawUrl = newres.history.redirect_url
-        scheme = newres.history.scheme
-        auth_method, userpass = newres.history.auth
+        rawReq = str(new_req)
+        rawUrl = new_req.redirect_url
+        scheme = new_req.scheme
+        auth_method, userpass = new_req.auth
+
+        payload_values_array = []
 
         for payload_pos, payload_content in enumerate(payload, start=start_from):
             fuzz_word = "FUZ" + str(payload_pos) + "Z" if payload_pos > 1 else "FUZZ"
@@ -469,7 +459,7 @@ class FuzzResultFactory:
 
             if auth_method and (userpass.count(fuzz_word)):
                 userpass, desc = FuzzResultFactory.replace_fuzz_word(userpass, fuzz_word, payload_content)
-            if newres.history.redirect_url.count(fuzz_word):
+            if new_req.redirect_url.count(fuzz_word):
                 rawUrl, desc = FuzzResultFactory.replace_fuzz_word(rawUrl, fuzz_word, payload_content)
             if rawReq.count(fuzz_word):
                 rawReq, desc = FuzzResultFactory.replace_fuzz_word(rawReq, fuzz_word, payload_content)
@@ -480,80 +470,18 @@ class FuzzResultFactory:
             if desc:
                 fuzz_values_array += desc
 
-            newres.payload.append(FuzzPayload(payload_content, fuzz_values_array))
+            payload_values_array.append(FuzzPayload(payload_content, fuzz_values_array))
 
-        newres.history.update_from_raw_http(rawReq, scheme)
-        newres.history.url = rawUrl
+        new_req.update_from_raw_http(rawReq, scheme)
+        new_req.url = rawUrl
         if auth_method != 'None':
-            newres.history.auth = (auth_method, userpass)
+            new_req.auth = (auth_method, userpass)
 
-        newres.type = FuzzResult.result
+        new_res = FuzzResult(new_req)
+        new_res.type = FuzzResult.result
+        new_res.payload = payload_values_array
 
-        return newres
-
-    @staticmethod
-    def from_baseline(options):
-        fuzzseed = options["compiled_seed"]
-        scheme = fuzzseed.history.scheme
-        rawReq = str(fuzzseed.history)
-        auth_method, userpass = fuzzseed.history.auth
-
-        baseline_payload = fuzzseed.get_baseline_markers(options)
-        if not baseline_payload:
-            return None
-
-        # remove baseline marker from seed request
-        for i in baseline_payload:
-            if not i:
-                raise FuzzExceptBadOptions("You must supply a baseline value for all the FUZZ words.")
-            rawReq = rawReq.replace("{" + i + "}", '')
-
-            if fuzzseed.history.wf_fuzz_methods:
-                fuzzseed.history.wf_fuzz_methods = fuzzseed.history.wf_fuzz_methods.replace("{" + i + "}", '')
-
-            if auth_method:
-                userpass = userpass.replace("{" + i + "}", '')
-
-        # re-parse seed without baseline markers
-        fuzzseed.history.update_from_raw_http(rawReq, scheme)
-        if auth_method:
-            fuzzseed.history.auth = (auth_method, userpass)
-
-        # create baseline request from seed
-        baseline_res = fuzzseed.from_soft_copy()
-
-        # remove field markers from baseline
-        marker_regex = re.compile(r"(FUZ\d*Z)\[(.*?)\]", re.DOTALL)
-        results = marker_regex.findall(rawReq)
-        if results:
-            for fw, f in results:
-                rawReq = rawReq.replace("%s[%s]" % (fw, f), fw)
-
-                if fuzzseed.history.wf_fuzz_methods:
-                    fuzzseed.history.wf_fuzz_methods = fuzzseed.history.wf_fuzz_methods.replace("{" + i + "}", '')
-
-                if auth_method:
-                    userpass = userpass.replace("{" + i + "}", '')
-
-            baseline_res.history.update_from_raw_http(rawReq, scheme)
-
-        baseline_res = FuzzResultFactory.from_seed(baseline_res, baseline_payload)
-        baseline_res.is_baseline = True
-
-        return baseline_res
-
-    @staticmethod
-    def from_options(options):
-        fr = FuzzRequest()
-
-        fr.url = options['url']
-        fr.wf_fuzz_methods = options['method']
-        fr.update_from_options(options)
-
-        fuzz_res = FuzzResult(fr)
-        fuzz_res.update_from_options(options)
-
-        return fuzz_res
+        return new_res
 
 
 class FuzzStats:
@@ -579,7 +507,7 @@ class FuzzStats:
     def from_requestGenerator(rg):
         tmp_stats = FuzzStats()
 
-        tmp_stats.url = rg.seed.history.redirect_url
+        tmp_stats.url = rg.seed.redirect_url
         tmp_stats.total_req = rg.count()
         tmp_stats.seed = rg.seed
 
@@ -852,9 +780,6 @@ class FuzzResult:
 
     def __ne__(self, other):
         return self.nres != other.nres
-
-    def get_baseline_markers(self, options):
-        return self.history.get_baseline_markers(options)
 
 
 class PluginItem:

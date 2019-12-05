@@ -22,8 +22,6 @@ from .exception import FuzzExceptBadOptions, FuzzExceptNoPluginError
 
 from .filter import FuzzResFilterSlice
 
-import re
-
 # Python 2 and 3: zip_longest
 try:
     from itertools import zip_longest
@@ -119,34 +117,17 @@ class requestGenerator(object):
         self.close()
 
     def restart(self, seed):
-        self.seed = seed
+        self.seed = seed.history
         self.dictio = self.get_dictio()
 
     def _check_dictio_len(self, element):
-        fuzz_words = self.options["compiled_filter"].get_fuzz_words() + self.options["compiled_prefilter"].get_fuzz_words() + self.get_fuzz_words()
-
-        if len(element) != len(set(fuzz_words)):
+        if len(element) != len(self.options.get_fuzz_words()):
             raise FuzzExceptBadOptions("FUZZ words and number of payloads do not match!")
-
-    def get_fuzz_words(self):
-        marker_regex = re.compile(r"FUZ\d*Z", re.MULTILINE | re.DOTALL)
-        fuzz_words = marker_regex.findall(str(self.seed.history))
-        method, userpass = self.seed.history.auth
-
-        fuzz_words += marker_regex.findall(self.seed.history.scheme)
-
-        if method:
-            fuzz_words += marker_regex.findall(userpass)
-
-        if self.options["seed_payload"]:
-            fuzz_words += ["FUZZ"]
-
-        return fuzz_words
 
     def count(self):
         v = self.dictio.count()
-        if self.seed.history.wf_allvars is not None:
-            v *= len(self.seed.history.wf_allvars_set)
+        if self.seed.wf_allvars is not None:
+            v *= len(self.seed.wf_allvars_set)
 
         if self.options["compiled_baseline"] is not None:
             v += 1
@@ -169,14 +150,21 @@ class requestGenerator(object):
 
         if self.options["seed_payload"] and isinstance(dictio_payload[0], FuzzResult):
             my_seed = dictio_payload[0].from_soft_copy()
-            my_seed.payload = []
             my_seed.history.update_from_options(self.options)
-            my_seed.update_from_options(self.options)
-            my_seed.payload.append(FuzzPayload(dictio_payload[0], [None]))
 
-            return FuzzResultFactory.from_seed(my_seed, dictio_payload[1:], 2)
+            new_res = FuzzResultFactory.from_seed(my_seed.history, dictio_payload[1:], 2)
 
-        return FuzzResultFactory.from_seed(my_seed, dictio_payload, start_from)
+            new_res.update_from_options(self.options)
+            # my_seed.payload.append(FuzzPayload(dictio_payload[0], [None]))
+
+            return new_res
+
+        else:
+
+            new_res = FuzzResultFactory.from_seed(my_seed, dictio_payload, start_from)
+            new_res.update_from_options(self.options)
+
+            return new_res
 
     def close(self):
         for payload in self._payload_list:
